@@ -91,7 +91,6 @@ class MagentoConfiguration
         $jsonRpcResult->result->post_max_size = ini_get('post_max_size');
         $jsonRpcResult->result->upload_max_filesize = ini_get('upload_max_filesize');
         $jsonRpcResult->result->zlib_output_compression = ini_get('zlib.output_compression');
-        $jsonRpcResult->result->magic_quotes_gpc = get_magic_quotes_gpc();
 
         $tableName = $this->_resourceConnection->getTableName('core_config_data');
         $pos = strrpos($tableName, 'core_config_data');
