@@ -27,7 +27,8 @@ class MagentoConfiguration
     protected $_productAttributeCollectionFactory;
     protected $_categoryAttributeCollectionFactory;
     protected $_customerGroupsCollection;
-
+    protected $_indexerCollectionFactory;
+    
     /**
      * MagentoConfiguration constructor
      *
@@ -43,6 +44,7 @@ class MagentoConfiguration
      * @param \Magento\Catalog\Model\ResourceModel\Product\Attribute\CollectionFactory $productAttributeCollectionFactory
      * @param \Magento\Catalog\Model\ResourceModel\Category\Attribute\CollectionFactory $categoryAttributeCollectionFactory
      * @param \Magento\Customer\Model\ResourceModel\Group\Collection $customerGroupsCollection
+     * @param \Magento\Indexer\Model\Indexer\CollectionFactory $indexerCollectionFactory
      */
     public function __construct(
         \Magento\Store\Model\StoreManager $storeManager,
@@ -56,7 +58,8 @@ class MagentoConfiguration
         \Magento\Backend\Helper\Data $backendHelper,
         \Magento\Catalog\Model\ResourceModel\Product\Attribute\CollectionFactory $productAttributeCollectionFactory,
         \Magento\Catalog\Model\ResourceModel\Category\Attribute\CollectionFactory $categoryAttributeCollectionFactory,
-        \Magento\Customer\Model\ResourceModel\Group\Collection $customerGroupsCollection
+        \Magento\Customer\Model\ResourceModel\Group\Collection $customerGroupsCollection,
+        \Magento\Indexer\Model\Indexer\CollectionFactory $indexerCollectionFactory
     ) {
         $this->_storeManager = $storeManager;
         $this->_file = $file;
@@ -70,6 +73,7 @@ class MagentoConfiguration
         $this->_productAttributeCollectionFactory = $productAttributeCollectionFactory;
         $this->_categoryAttributeCollectionFactory = $categoryAttributeCollectionFactory;
         $this->_customerGroupsCollection = $customerGroupsCollection;
+        $this->_indexerCollectionFactory = $indexerCollectionFactory;
     }
 
     /**
@@ -180,6 +184,19 @@ class MagentoConfiguration
         $jsonRpcResult->result->cataloginventory_item_options_notify_stock_qty = $this->_stockConfiguration->getNotifyStockQty();
         $jsonRpcResult->result->cataloginventory_item_options_enable_qty_increments = $this->_stockConfiguration->getEnableQtyIncrements();
         $jsonRpcResult->result->cataloginventory_item_options_qty_increments = $this->_stockConfiguration->getQtyIncrements();
+
+        
+        $indexerCollection = $this->_indexerCollectionFactory->create();
+        $jsonRpcResult->result->indexers = array();
+
+        foreach ($indexerCollection->getItems() as $indexer) {
+            $indexerInfo = new \stdClass();
+            $indexerInfo->indexer_id = $indexer->getId();
+            $indexerInfo->title = $indexer->getTitle();
+            $indexerInfo->description = $indexer->getDescription();
+
+            $jsonRpcResult->result->indexers[] = $indexerInfo;
+        }
     }
 
     /**

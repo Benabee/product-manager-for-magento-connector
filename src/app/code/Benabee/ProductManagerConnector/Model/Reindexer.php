@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @package   Benabee_ProductManagerConnector
  * @author    Maxime Coudreuse <contact@benabee.com>
@@ -19,25 +20,27 @@ class Reindexer
     protected $_productModel;
     protected $_productFactory;
     protected $_productRepository;
-    protected $_indexerFactory;
     protected $_indexerCollectionFactory;
     protected $_productCollectionFactory;
     protected $_urlRewriteGenerator;
     protected $_urlRewrite;
     protected $_urlPersist;
     protected $_urlFinder;
-    protected $_productUrlPathGenerator;
     protected $_cacheManager;
     protected $_productMetadata;
+    protected $_searchCriteriaBuilder;
+    protected $_sourceItemsBySku;
+    protected $_sourceItemRepository;
+
+
 
     /**
-     * Reindexer constructor
+     * Constructor
      *
      * @param \Magento\Store\Model\StoreManager $storeManager
      * @param \Magento\Catalog\Model\Product $productModel
      * @param \Magento\Catalog\Model\ProductFactory $productFactory
      * @param \Magento\Catalog\Api\ProductRepositoryInterface $productRepository
-     * @param \Magento\Indexer\Model\IndexerFactory $indexerFactory
      * @param \Magento\Indexer\Model\Indexer\CollectionFactory $indexerCollectionFactory
      * @param \Magento\Catalog\Model\ResourceModel\Product\CollectionFactory $productCollectionFactory
      * @param \Magento\CatalogUrlRewrite\Model\ProductUrlRewriteGenerator $urlRewriteGenerator
@@ -47,13 +50,15 @@ class Reindexer
      * @param \Magento\CatalogUrlRewrite\Model\ProductUrlPathGenerator $productUrlPathGenerator
      * @param \Magento\Framework\App\CacheInterface $cacheManager
      * @param \Magento\Framework\App\ProductMetadataInterface $productMetadata
+     * @param \Magento\Framework\Api\SearchCriteriaBuilder $searchCriteriaBuilder
+     * @param \Magento\InventoryApi\Api\GetSourceItemsBySkuInterface $sourceItemsBySku
+     * @param \Magento\InventoryApi\Api\SourceItemRepositoryInterface $sourceItemRepository
      */
     public function __construct(
         \Magento\Store\Model\StoreManager $storeManager,
         \Magento\Catalog\Model\Product $productModel,
         \Magento\Catalog\Model\ProductFactory $productFactory,
         \Magento\Catalog\Api\ProductRepositoryInterface $productRepository,
-        \Magento\Indexer\Model\IndexerFactory $indexerFactory,
         \Magento\Indexer\Model\Indexer\CollectionFactory $indexerCollectionFactory,
         \Magento\Catalog\Model\ResourceModel\Product\CollectionFactory $productCollectionFactory,
         \Magento\CatalogUrlRewrite\Model\ProductUrlRewriteGenerator $urlRewriteGenerator,
@@ -62,13 +67,15 @@ class Reindexer
         \Magento\UrlRewrite\Model\UrlFinderInterface $urlFinder,
         \Magento\CatalogUrlRewrite\Model\ProductUrlPathGenerator $productUrlPathGenerator,
         \Magento\Framework\App\CacheInterface $cacheManager,
-        \Magento\Framework\App\ProductMetadataInterface $productMetadata
+        \Magento\Framework\App\ProductMetadataInterface $productMetadata,
+        \Magento\Framework\Api\SearchCriteriaBuilder $searchCriteriaBuilder, // Magento 2.2+ ?
+        \Magento\InventoryApi\Api\GetSourceItemsBySkuInterface $sourceItemsBySku, // Magento 2.3+
+        \Magento\InventoryApi\Api\SourceItemRepositoryInterface $sourceItemRepository //  Magento 2.3+
     ) {
         $this->_storeManager = $storeManager;
         $this->_productModel = $productModel;
         $this->_productFactory = $productFactory;
         $this->_productRepository = $productRepository;
-        $this->_indexerFactory = $indexerFactory;
         $this->_indexerCollectionFactory = $indexerCollectionFactory;
         $this->_productCollectionFactory = $productCollectionFactory;
         $this->_urlRewriteGenerator = $urlRewriteGenerator;
@@ -78,29 +85,12 @@ class Reindexer
         $this->_productUrlPathGenerator = $productUrlPathGenerator;
         $this->_cacheManager = $cacheManager;
         $this->_productMetadata = $productMetadata;
+        $this->_searchCriteriaBuilder = $searchCriteriaBuilder;
+        $this->_sourceItemsBySku = $sourceItemsBySku;
+        $this->_sourceItemRepository = $sourceItemRepository;
     }
 
-    /**
-     * Reindex products
-     *
-     * @param $jsonRpcResult
-     * @param $productIds
-     */
-    public function reindexProducts(&$jsonRpcResult, $productIds)
-    {
-        $startTime = microtime(true);
 
-        $this->_storeManager->setCurrentStore('admin');
-        $result = [];
-
-        $this->loadAndSaveProducts($result, $productIds);
-        $this->regenerateUrlRewrite($result, $productIds);
-        $this->reindexProductsWithAllIndexers($result, $productIds);
-
-        $jsonRpcResult->result = $result;
-
-        $jsonRpcResult->executionTime = microtime(true) - $startTime;
-    }
 
     /**
      * Load and save products
@@ -110,6 +100,8 @@ class Reindexer
      */
     public function loadAndSaveProducts(&$result, $productIds)
     {
+        $this->_storeManager->setCurrentStore('admin');
+
         $count = count($productIds);
 
         for ($i = 0; $i < $count; ++$i) {
@@ -133,6 +125,22 @@ class Reindexer
                         $product->setMediaGalleryEntries($product->getMediaGalleryEntries());
                     }
 
+                    // Fix has_options for configurable products
+                    // https://magento.stackexchange.com/questions/201587/magento-2-how-to-create-configurable-product-programmatically
+                    if ($product->getTypeId() == 'configurable') {
+                        $configurable_attributes_data = $product->getTypeInstance()->getConfigurableAttributesAsArray($product);
+                        $product->setCanSaveConfigurableAttributes(true);
+                        $product->setConfigurableAttributesData($configurable_attributes_data);
+                    }
+
+                    // Fix has_options for bundle products
+                    if ($product->getTypeId() == 'bundle') {
+                        $product->setCanSaveBundleSelections(true);
+                        //$bundleSelections = $product->getTypeInstance()->getOptions($product);
+                        //$options = $product->getBundleOptionsData();
+                        //$product->setBundleSelectionsData($bundleSelections);
+                    }
+
                     if (!$this->_productRepository->save($product)) {
                         $r->error = "Load and save product error (product $productId):" . " save failed product";
                     } else {
@@ -146,7 +154,7 @@ class Reindexer
         }
 
         $r->executionTime = microtime(true) - $startTime;
-        $result[] = $r;
+        $result = $r;
     }
 
     /**
@@ -155,13 +163,19 @@ class Reindexer
      * @param $result
      * @param $productIds
      */
-    public function regenerateUrlRewrite(&$result, $productIds)
+    public function regenerateProductsUrlRewrites(&$result, $productIds)
     {
-        $stores = $this->_storeManager->getStores(false);
-        foreach ($stores as $store) {
-            $collection = $this->_productCollectionFactory->create();
+        $this->_storeManager->setCurrentStore('admin');
 
+        $a = [];
+
+        $stores = $this->_storeManager->getStores(false);
+ 
+        foreach ($stores as $store) {
+
+            $collection = $this->_productCollectionFactory->create();
             $storeId = $store->getId();
+
             $collection->addStoreFilter($store->getId())
                 ->setStoreId($store->getId());
 
@@ -172,19 +186,54 @@ class Reindexer
             $collection->addAttributeToSelect(['url_path', 'url_key', 'visibility']);
             $productList = $collection->load();
 
-            $a = [];
-
-            $nbProducts = $productList->count();
+            //$a[] = 'nb stores=' . count($stores) . ' store id=' . $storeId . 'nbProducts=' .  $productList->count();
 
             foreach ($productList as $product) {
                 $startTime = microtime(true);
                 $r = new \StdClass();
                 $r->productId = $product->getId();
-                $r->storeId = $product->getStoreId();
+                $r->storeId = $store->getId();
+                $r->storeCode = $store->getCode();
                 $r->urlKey = $product->getUrlKey();
+                $r->visibility = $product->getVisibility();
+
+                switch ($product->getVisibility()) {
+                    case \Magento\Catalog\Model\Product\Visibility::VISIBILITY_NOT_VISIBLE:
+                        $r->visibilityString = "Not Visible Individually";
+                        break;
+                    case \Magento\Catalog\Model\Product\Visibility::VISIBILITY_IN_CATALOG:
+                        $r->visibilityString = "Catalog";
+                        break;
+                    case \Magento\Catalog\Model\Product\Visibility::VISIBILITY_IN_SEARCH:
+                        $r->visibilityString = "Search";
+                        break;
+                    case \Magento\Catalog\Model\Product\Visibility::VISIBILITY_BOTH:
+                        $r->visibilityString = "Catalog, Search";
+                        break;
+                }
+
+                // Find existing rewrites
+                $existingUrls = $this->_urlFinder->findAllByData([
+                    \Magento\UrlRewrite\Service\V1\Data\UrlRewrite::ENTITY_ID => $product->getId(),
+                    \Magento\UrlRewrite\Service\V1\Data\UrlRewrite::ENTITY_TYPE => \Magento\CatalogUrlRewrite\Model\ProductUrlRewriteGenerator::ENTITY_TYPE,
+                    \Magento\UrlRewrite\Service\V1\Data\UrlRewrite::REDIRECT_TYPE => 0,
+                    \Magento\UrlRewrite\Service\V1\Data\UrlRewrite::STORE_ID => $store->getId(),
+                ]);
+
+                $r->existingUrlRewrites = array();
+                foreach ($existingUrls as &$urlRewrite) {
+                    $u = new \StdClass();
+                    $u->url_rewrite_id = $urlRewrite->getUrlRewriteId();
+                    $u->entity_type = $urlRewrite->getEntityType();
+                    $u->entity_id = $urlRewrite->getEntityId();
+                    $u->request_path = $urlRewrite->getRequestPath();
+                    $u->target_path = $urlRewrite->getTargetPath();
+                    $u->redirect_type = $urlRewrite->getRedirectType();
+                    $u->storeId = $urlRewrite->getStoreId();
+                    $r->existingUrlRewrites[] = $u;
+                }
 
                 if ($product->isVisibleInSiteVisibility()) {
-                    // Product is visible in current store
                     try {
                         $product->unsUrlPath();
                         $urlPath = $this->_productUrlPathGenerator->getUrlPath($product);
@@ -193,13 +242,16 @@ class Reindexer
                         // Generate new rewrites
                         $newUrls = $this->_urlRewriteGenerator->generate($product);
 
-                        // Find existing rewrites
-                        $existingUrls = $this->_urlFinder->findAllByData([
-                            \Magento\UrlRewrite\Service\V1\Data\UrlRewrite::ENTITY_ID => $product->getId(),
-                            \Magento\UrlRewrite\Service\V1\Data\UrlRewrite::ENTITY_TYPE => "product",
-                            \Magento\UrlRewrite\Service\V1\Data\UrlRewrite::REDIRECT_TYPE => 0,
-                            \Magento\UrlRewrite\Service\V1\Data\UrlRewrite::STORE_ID => $product->getStoreId()
-                        ]);
+                        $r->newUrlRewrites = array();
+                        foreach ($newUrls as &$urlRewrite) {
+                            $u = new \StdClass();
+                            $u->entity_type = $urlRewrite->getEntityType();
+                            $u->entity_id = $urlRewrite->getEntityId();
+                            $u->request_path = $urlRewrite->getRequestPath();
+                            $u->target_path = $urlRewrite->getTargetPath();
+                            $u->storeId = $urlRewrite->getStoreId();
+                            $r->newUrlRewrites[] = $u;
+                        }
 
                         if (!$this->compareUrlRewriteArrays($newUrls, $existingUrls)) {
                             // The URL rewrites are not the same
@@ -209,37 +261,45 @@ class Reindexer
                                 $this->_urlPersist->deleteByData([
                                     \Magento\UrlRewrite\Service\V1\Data\UrlRewrite::REQUEST_PATH => $newUrl->getRequestPath(),
                                     \Magento\UrlRewrite\Service\V1\Data\UrlRewrite::REDIRECT_TYPE => 301,
-                                    \Magento\UrlRewrite\Service\V1\Data\UrlRewrite::STORE_ID => $product->getStoreId()
+                                    \Magento\UrlRewrite\Service\V1\Data\UrlRewrite::STORE_ID => $store->getId()
                                 ]);
                             }
 
                             // Update URL rewrites in the database
                             $this->_urlPersist->replace($newUrls);
-                            $r->result = 'Regenerate url rewrite successful (product ' . $product->getId() . '). Urls=' . implode(', ', array_keys($newUrls));
+
+                            //$r->result = 'Regenerate url rewrite successful (product ' . $product->getId() . '). Urls=' . implode(', ', array_keys($newUrls));
+                            $r->result = 'Url rewrites replaced';
                         } else {
                             // The URL rewrites are the same
-                            $r->result = 'Regenerate url rewrite unchanged (product ' . $product->getId() . '). Urls=' . implode(', ', array_keys($newUrls));
+
+                            $r->result = 'Url rewrites unchanged';
+                            //$r->result = 'Regenerate url rewrite unchanged (product ' . $product->getId() . '). Urls=' . implode(', ', array_keys($newUrls));
                         }
                     } catch (\Exception $e) {
-                        $r->error = 'Regenerate url rewrite error (product: ' . $product->getId() . '): storeId= ' . $product->getStoreId() . ' Message= ' . $e->getMessage() . '      Urls=' . implode(', ', array_keys($newUrls));
+                        $r->error = 'Url rewrites error';
+                        $r->message = $e->getMessage();
                     }
 
                     $r->executionTime = microtime(true) - $startTime;
                     $a[] = $r;
                 } else {
-                    // Product is not visible in current store
-                    $product->setStoreId($store->getId());
+                    //$product->setStoreId($store->getId());
                     $this->_urlPersist->deleteByData([
                         \Magento\UrlRewrite\Service\V1\Data\UrlRewrite::ENTITY_ID => $product->getId(),
                         \Magento\UrlRewrite\Service\V1\Data\UrlRewrite::ENTITY_TYPE => \Magento\CatalogUrlRewrite\Model\ProductUrlRewriteGenerator::ENTITY_TYPE,
                         \Magento\UrlRewrite\Service\V1\Data\UrlRewrite::REDIRECT_TYPE => 0,
-                        \Magento\UrlRewrite\Service\V1\Data\UrlRewrite::STORE_ID => $product->getStoreId()
+                        \Magento\UrlRewrite\Service\V1\Data\UrlRewrite::STORE_ID => $store->getId()
                     ]);
+
+                    $r->result = 'Url rewrites deleted';
+                    $r->comment = 'Existing URLS deleted because product is not visible';
+                    $a[] = $r;
                 }
             }
         }
 
-        $result[] = $a;
+        $result->result = $a;
     }
 
     /**
@@ -250,7 +310,7 @@ class Reindexer
      */
     public function simplifyUrlRewriteArray(array $urls)
     {
-        $a = [];
+        $a = array();
 
         foreach ($urls as $url) {
 
@@ -274,41 +334,164 @@ class Reindexer
      */
     public function compareUrlRewriteArrays(array $newUrls, array $existingUrls)
     {
+        //shuffle($newUrls);
         $a = $this->simplifyUrlRewriteArray($newUrls);
         $b = $this->simplifyUrlRewriteArray($existingUrls);
-        return ($a == $b);
+        $result = ($a == $b);
+        return $result;
     }
 
+        
     /**
-     * Reindex product
-     * 
-     * @param $result
-     * @param $productIds
+     * Reindex products using Magento indexers
+     *
+     * @param  mixed $jsonRpcResult
+     * @param  mixed $productIds
+     * @param  mixed $reindexerIds
+     * @return void
      */
-    public function reindexProductsWithAllIndexers(&$result, $productIds)
+    public function reindexProductsUsingIndexers(&$jsonRpcResult, $productIds, $reindexerIds)
     {
-        $indexer = $this->_indexerFactory->create();
+        $this->_storeManager->setCurrentStore('admin');
+
+        $skipIndexerIds = ['design_config_grid', 'customer_grid', 'elasticsuite_thesaurus'];
+        $a = array();
+
         $indexerCollection = $this->_indexerCollectionFactory->create();
         $indexerIds = $indexerCollection->getAllIds();
 
         $productsIdsString = implode(',', $productIds);
 
-        foreach ($indexerIds as $indexId) {
+        foreach ($indexerCollection->getItems() as $indexer) {
+            $indexerId = $indexer->getId();
+            $skipIndexer = false;
+
+            // Skip if $indexerId is in $skipIndexerIds
+            if (in_array($indexerId, $skipIndexerIds)) {
+                $skipIndexer = true;
+            }
+
+            // Skip if $indexerId is not in $reindexerIds
+            if (!empty($reindexerIds) && !in_array($indexerId, $reindexerIds)) {
+                $skipIndexer = true;
+            }
+
+            if ($skipIndexer) {
+                continue;
+            }
+
             $startTime = microtime(true);
+            if ($indexerId == "inventory") {
+                $skus = $this->getSkus($productIds);
+                $sourceItems = $this->getSourceItems($skus);
+                // $sourceItems = ["2110", "2112", "2113"];
+                // vendor/magento/module-inventory-indexer/Indexer/SourceItem/SourceItemIndexer.php
 
-            $idx = $indexer->load($indexId);
-
-            if (method_exists($idx, 'executeList')) {
-                //Magento version >=  2.3
-                $idx->executeList($productIds);
+                if (!empty($sourceItems)) {
+                    if (method_exists($indexer, 'executeList')) {
+                        //Magento version >=  2.3
+                        $indexer->executeList($sourceItems);
+                    } else {
+                        $indexer->reindexList($sourceItems);
+                    }
+                }
             } else {
-                $idx->reindexList($productIds);
+                if (method_exists($indexer, 'executeList')) {
+                    //Magento version >=  2.3
+                    $indexer->executeList($productIds);
+                } else {
+                    $indexer->reindexList($productIds);
+                }
             }
 
             $r = new \StdClass();
-            $r->result = "Reindex $indexId successful (product $productsIdsString)";
+            $r->result = "Reindex $indexerId successful (product $productsIdsString)";
             $r->executionTime = microtime(true) - $startTime;
-            $result[] = $r;
+            $a[] = $r;
         }
+
+        $jsonRpcResult->result = $a;
+    }
+    
+    /**
+     * Get product SKUs
+     *
+     * @param  mixed $productIds
+     * @return void
+     */
+    public function getSkus($productIds)
+    {
+        $collection = $this->_productCollectionFactory->create();
+
+        if (!empty($productIds)) {
+            $collection->addIdFilter($productIds);
+        }
+
+        $collection->addAttributeToSelect(['sku']);
+        $productList = $collection->load();
+
+        $skus = array();
+        foreach ($collection as $product) {
+            $skus[] = $product->getSku();
+        }
+
+        return $skus;
+    }
+    
+    /**
+     * Get source items associated to SKUs
+     *
+     * @param  mixed $skus
+     * @return void
+     */
+    public function getSourceItems($skus)
+    {
+        $sourceItems = array();
+
+        /*foreach ($skus as $sku) {
+            $s = $this->_sourceItemsBySku->getSourceItemBySku($sku);
+        }*/
+
+        $searchCriteria = $this->_searchCriteriaBuilder->addFilter(\Magento\Catalog\Api\Data\ProductInterface::SKU, $skus, 'in')->create();
+
+
+        /*$searchCriteria = $this->_searchCriteriaBuilder
+            ->addFilter(new \Magento\Framework\Api\Filter([
+                \Magento\Framework\Api\Filter::KEY_FIELD => \Magento\Catalog\Api\Data\ProductInterface::SKU,
+                \Magento\Framework\Api\Filter::KEY_CONDITION_TYPE => 'in',
+                \Magento\Framework\Api\Filter::KEY_VALUE => $skus
+            ]))
+            ->create();*/
+
+        $sourceItemData = $this->_sourceItemRepository->getList($searchCriteria);
+
+        foreach ($sourceItemData->getItems() as $sourceItem) {
+            $sourceItems[] = $sourceItem->getSourceItemId();
+        }
+
+        return $sourceItems;
+    }
+
+    
+    /**
+     * Clean product cache
+     *
+     * @param  mixed $result
+     * @param  mixed $productIds
+     * @return void
+     */
+    public function cleanProductsCache(&$result, $productIds)
+    {
+        $this->_storeManager->setCurrentStore('admin');
+
+        $count = count($productIds);
+
+        for ($i = 0; $i < $count; ++$i) {
+            $productId = $productIds[$i];
+            $this->_cacheManager->clean('catalog_product_' . $productId);
+        }
+
+        $productsIdsString = implode(',', $productIds);
+        $result->result = "product cache cleaned (product $productsIdsString)";
     }
 }

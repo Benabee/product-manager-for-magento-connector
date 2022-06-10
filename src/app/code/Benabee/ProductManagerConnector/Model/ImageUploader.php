@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @package   Benabee_ProductManagerConnector
  * @author    Maxime Coudreuse <contact@benabee.com>
@@ -82,6 +83,7 @@ class ImageUploader
         $data,
         $lastModificationTime,
         $failIfFileExists,
+        $useDispretionPath,
         $request
     ) {
         $nbBytes = 0;
@@ -91,19 +93,27 @@ class ImageUploader
         $remoteFileSize = -1;
         $remoteLastModificationTime = 0;
         $imagesDeletedInCache = 0;
-       
+
         // \Magento\Framework\Api\ImageProcessor
         $base = '';
-        $filePath  = '';
-        $fileNameWithDispretionPath = $this->getFilenameWithDispersionPath($filename);
-
         if ($type == 'product') {
             $base = $this->_productMediaConfig->getBaseMediaPath();
-            $filePath = $this->_productMediaConfig->getMediaPath($fileNameWithDispretionPath);
-
         } elseif ($type == 'category') {
-            $base = $this->_storeManager->getStore()->getBaseMediaDir() .'catalog/category';
+            //$base = $this->_storeManager->getStore()->getBaseMediaDir() .'catalog/category';
+            $base = 'catalog/category';
+        }
+
+        $fileName = \Magento\MediaStorage\Model\File\Uploader::getCorrectFileName($filename);
+        $fileNameWithDispretionPath = '';
+        $filePath  = '';
+
+        if ($useDispretionPath) {
+            $dispretionPath = \Magento\MediaStorage\Model\File\Uploader::getDispretionPath($fileName);
+            $fileNameWithDispretionPath = $dispretionPath . '/' . $fileName;
             $filePath = $base . $fileNameWithDispretionPath;
+        } else {
+            $fileNameWithDispretionPath = $fileName;
+            $filePath = $base . '/' .  $fileNameWithDispretionPath;
         }
 
         $mediaDirectory = $this->_filesystem->getDirectoryWrite(\Magento\Framework\App\Filesystem\DirectoryList::MEDIA);
@@ -120,12 +130,10 @@ class ImageUploader
 
                 // Get new recommended file name
                 $noDuplicatedFileName = \Magento\MediaStorage\Model\File\Uploader::getNewFileName($absoluteFilePath);
-
             } elseif (!$this->_file->isWritable($absoluteFilePath)) {
                 // The file is not writable
                 $error = 'ERROR_FILE_NOT_WRITABLE';
             }
-
         } else {
 
             // Check that the directory is writable
@@ -139,11 +147,11 @@ class ImageUploader
         // Upload the image
         if ($error == null) {
             $fileUploaded = false;
-            
+
             $file = $request->getFiles('image0');
-          
+
             if ($file) {
-                $uploader = $this->_uploader->create(['fileId' =>'image0']);
+                $uploader = $this->_uploader->create(['fileId' => 'image0']);
                 $uploader->setAllowCreateFolders(true);
                 $uploader->setAllowRenameFiles(false);
 
@@ -153,7 +161,7 @@ class ImageUploader
                 if ($result['file']) {
                     $fileUploaded = true;
                 }
-        
+
                 // Update cached images
                 if ($fileUploaded) {
                     $this->_file->touch($absoluteFilePath, $lastModificationTime);
@@ -192,6 +200,7 @@ class ImageUploader
             $jsonRpcResult->error->remotefilesize = $remoteFileSize;
             $jsonRpcResult->error->remotelastmodificationtime = $remoteLastModificationTime;
             $jsonRpcResult->error->noduplicatedfilename = $noDuplicatedFileName;
+            $jsonRpcResult->error->base = $base;
         } else {
             $jsonRpcResult->result = new \stdClass();
             $jsonRpcResult->result->nbbytes = $nbBytes;
@@ -201,6 +210,7 @@ class ImageUploader
             $jsonRpcResult->result->remotefilesize = $remoteFileSize;
             $jsonRpcResult->result->remotelastmodificationtime = $remoteLastModificationTime;
             $jsonRpcResult->result->imagesDeletedInCache = $imagesDeletedInCache;
+            $jsonRpcResult->result->base = $base;
         }
     }
 
@@ -217,7 +227,7 @@ class ImageUploader
         $imagesToDelete = [];
         $search = $baseAbsolutePath . '/cache/*' . $fileNameWithDispretionPath;  //media\catalog\product\cache\1\small_image\135x\9df78eab33525d08d6e5fb8d27136e95\y\u\yulips.jpg
         $imagesToDelete = glob($search);
-        
+
         foreach ($imagesToDelete as $imagePath) {
             if ($this->_file->isExists($imagePath)) {
                 $this->_file->deleteFile($imagePath);
@@ -245,9 +255,8 @@ class ImageUploader
         if ($type == 'product') {
             $base = $this->_productMediaConfig->getBaseMediaPath();
             $filePath = $this->_productMediaConfig->getMediaPath($fileNameWithDispretionPath);
-
         } elseif ($type == 'category') {
-            $base = $this->_storeManager->getStore()->getBaseMediaDir() .'catalog/category';
+            $base = $this->_storeManager->getStore()->getBaseMediaDir() . 'catalog/category';
             $filePath = $base . $fileNameWithDispretionPath;
         }
 

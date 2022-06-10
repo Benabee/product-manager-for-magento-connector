@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @package   Benabee_ProductManagerConnector
  * @author    Maxime Coudreuse <contact@benabee.com>
@@ -46,6 +47,14 @@ class Database
     }
 
     /**
+     * Close database connection
+     */
+    public function closeConnection()
+    {
+        $this->_resourceConnection->closeConnection();
+    }
+
+    /**
      * Execute SQL query
      *
      * @param $jsonRpcResult
@@ -87,7 +96,6 @@ class Database
                     //starts with SELECT or SHOW
                     $jsonRpcResult->result = new \stdClass();
                     $jsonRpcResult->result->rows = $query->fetchAll(\Zend_Db::FETCH_NUM);
-
                 } else {
                     $jsonRpcResult->result = $query->rowCount();
                 }

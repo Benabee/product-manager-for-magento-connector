@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @package   Benabee_ProductManagerConnector
  * @author    Maxime Coudreuse <contact@benabee.com>
@@ -15,7 +16,8 @@ namespace Benabee\ProductManagerConnector\Model;
  */
 class RequestHandler
 {
-    const BRIDGE_VERSION = '2.1.8';
+    const EXTENSION_VERSION = '0.3.0';
+    const BRIDGE_VERSION = '2.4.0'; // The extension is based on this bridge file version
 
     protected $_magentoConfiguration;
     protected $_database;
@@ -71,7 +73,6 @@ class RequestHandler
     {
         if (function_exists('openssl_decrypt')) {
             $plaintext = openssl_decrypt($ciphertext, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
-
         } elseif (function_exists('mcrypt_module_open')) {
             // @codingStandardsIgnoreStart
             $td = @mcrypt_module_open(MCRYPT_RIJNDAEL_128, '', MCRYPT_MODE_CBC, '');
@@ -180,7 +181,7 @@ class RequestHandler
         if (strlen($securityKeyBase64) != 44) {
             throw new \Magento\Framework\Exception\LocalizedException(
                 __('FATAL_ERROR_SECURITY_KEY : Security key must be 44 caracters long. Current length is ' . strlen($securityKeyBase64)
-                . '. You need to log in to your store admin panel, go to Store > Configuration > Catalog > Product Manager For Magento Connector, click "Generate new security key" button and click "Save Config" button.')
+                    . '. You need to log in to your store admin panel, go to Store > Configuration > Catalog > Product Manager For Magento Connector, click "Generate new security key" button and click "Save Config" button.')
             );
         }
 
@@ -228,6 +229,8 @@ class RequestHandler
         }
 
         $jsonRpcResult = $this->executeJsonRpc($jsonRpc[1], $request);
+        $this->_database->closeConnection();
+
         $jsonRpcResult->executionTime = microtime(true) - $startTime;
 
         return json_encode($jsonRpcResult);
@@ -255,7 +258,6 @@ class RequestHandler
             for ($i = 0; $i < $count; ++$i) {
                 $jsonRpcResult->result[$i] = $this->executeJsonRpc($jsonRpc->params[$i], $request);
             }
-
         } elseif ($jsonRpc->method == 'sqlquery') {
             $is_read = ($jsonRpc->params[0] == 'r');
             $sql = $jsonRpc->params[1];
@@ -266,17 +268,21 @@ class RequestHandler
                 $binds[] = $jsonRpc->params[$i];
             }
             $this->_database->executeSqlQuery($jsonRpcResult, $is_read, $sql, $binds);
-
         } elseif ($jsonRpc->method == 'databaseconnection') {
             $databaseAPI = $jsonRpc->params[0];
             $this->_database->executeDatabaseConnection($jsonRpcResult, $databaseAPI);
-
         } elseif ($jsonRpc->method == 'uploadimage') {
             $type = $jsonRpc->params[0];
             $filename = $jsonRpc->params[1];
             $data = $jsonRpc->params[2]; //unused
             $lastModificationTime = $jsonRpc->params[3];
             $failIfFileExists = $jsonRpc->params[4];
+            $useDispretionPath = true;
+
+            // To keep compatibility with Product Manager version < 2.1.1.65
+            if (count($jsonRpc->params) > 5) {
+                $useDispretionPath = $jsonRpc->params[5];
+            }
 
             $this->_imageUploader->uploadImage(
                 $jsonRpcResult,
@@ -285,29 +291,42 @@ class RequestHandler
                 $data,
                 $lastModificationTime,
                 $failIfFileExists,
+                $useDispretionPath,
                 $request
             );
         } elseif ($jsonRpc->method == 'deleteimage') {
             $type = $jsonRpc->params[0];
             $filename = $jsonRpc->params[1];   // h/t/htc-touch-diamond.jpg
             $this->_imageUploader->deleteImage($jsonRpcResult, $type, $filename);
-
         } elseif ($jsonRpc->method == 'getconfig') {
             $this->_magentoConfiguration->getConfig($jsonRpcResult);
-
         } elseif ($jsonRpc->method == 'getsourcemodels') {
             $store_id = $jsonRpc->params[0];
             $locale_code = $jsonRpc->params[1];
             $this->_magentoConfiguration->getSourceModels($jsonRpcResult, $store_id, $locale_code);
-
-        } elseif ($jsonRpc->method == 'reindexproducts') {
+        } elseif ($jsonRpc->method == 'loadandsaveproducts') {
             $productIds = $jsonRpc->params;
-            $this->_reindexer->reindexProducts($jsonRpcResult, $productIds);
-
+            $this->_reindexer->loadAndSaveProducts($jsonRpcResult, $productIds);
+            //
+        } elseif ($jsonRpc->method == 'regenerateproductsurlrewrites') {
+            $productIds = $jsonRpc->params;
+            $this->_reindexer->regenerateProductsUrlRewrites($jsonRpcResult, $productIds);
+            //
+        } elseif ($jsonRpc->method == 'reindexproductsusingindexers') {
+            $productIds = $jsonRpc->params->productIds;
+            $reindexerIds = $jsonRpc->params->reindexerIds;
+            $this->_reindexer->reindexProductsUsingIndexers($jsonRpcResult, $productIds, $reindexerIds);
+            //
+        } elseif ($jsonRpc->method == 'cleanproductscache') {
+            $productIds = $jsonRpc->params;
+            $this->_reindexer->cleanProductsCache($jsonRpcResult, $productIds);
         } elseif ($jsonRpc->method == 'connect') {
             $jsonRpcResult->result = new \stdClass();
+            $jsonRpcResult->result->platform = 'Magento 2';
+            $jsonRpcResult->result->bridgetype = 'Extension';
+            $jsonRpcResult->result->extensionversion = self::EXTENSION_VERSION;
             $jsonRpcResult->result->bridgeversion = self::BRIDGE_VERSION;
-            $jsonRpcResult->result->technology = 'Magento 2';
+            $jsonRpcResult->result->bridgeapiversion = '2';
         }
 
         $jsonRpcResult->id = $jsonRpc->id;
