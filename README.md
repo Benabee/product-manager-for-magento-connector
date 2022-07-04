@@ -3,19 +3,28 @@
 This Magento 2 extension must be used with
 [Product Manager for Magento](https://www.benabee.com/en/product-manager-for-magento).
 
-It allows the software to connect to the websit and access the website data.
+It allows the software to connect to the Magento website and access the website data.
 
 
 
 ## Installation
 
+The extension can be installed using Composer or an archive file.
 
+### Installation using Composer
+```
+composer require benabee/product-manager-connector --no-update
+```
+
+### Installation using archive file
 Upload the archive to the Magento root folder and run these commands:
 ```
-tar xvzf product-manager-connector-0.4.tar.gz app/code/Benabee/ProductManagerConnector/
+tar xvzf product-manager-connector-1.0.0.tar.gz app/code/Benabee/ProductManagerConnector/
 php bin/magento module:enable Benabee_ProductManagerConnector
 php bin/magento setup:upgrade
 ```
+
+
 
 
 ## Configuration
@@ -31,30 +40,21 @@ Click Save Config.
 
 Copy the security key.
 
-Close Product Manager for Magento if it's running.
+Click File > Configuration Wizard in Product Manager.
 
-On Windows, open configV2.xml in ```C:\Users\{Your username}\AppData\Local\Benabee\ProductManagerForMagento```.
+Choose Connect with "Product Manager Connector extension (Magento 2 only)".
 
-On Mac, open configV2.xml in ```~/Library/Application Support/Product Manager for Magento```.
+Paste the secret key.
 
-![](doc/configuration1.png)
+Complete the Configuration Wizard.
 
-Replace the bridge filename by "productmanagerconnector/".
-
-Replace the encryptionKey by the generated Security Key.
-
-Key is not used anymore. You can delete the value.
-
-![](doc/configuration2.png)
-
-Save the file.
 
 
 Version history
 ===============
 - Version 0.2 based on bridge version 2.1.8
 - Version 0.3 based on bridge version 2.4.0
-
+- Version 1.0.0 based on bridge version 2.4.0
 
 
 
