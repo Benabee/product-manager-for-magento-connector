@@ -224,7 +224,7 @@ class MagentoConfiguration
                 $sourceModel->attribute_frontend_label = $attribute->getFrontendLabel();
                 $sourceModel->model_class = $attribute->getSourceModel();
                 $sourceModel->options = $attribute->getSource()->getAllOptions();
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 $sourceModel->error = 'Exception: ' . $e->getMessage() . ' Trace: ' . $e->getTraceAsString();
             }
             $models[] = $sourceModel;
@@ -251,7 +251,7 @@ class MagentoConfiguration
             if ($model) {
                 $sourceModel->options = $model->getAllOptions(true);
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $sourceModel->error = 'Exception: ' . $e->getMessage() . ' Trace: ' . $e->getTraceAsString();
         }
 
@@ -276,7 +276,7 @@ class MagentoConfiguration
             if ($model) {
                 $sourceModel->options = $model->getOptions();
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $sourceModel->error = 'Exception: ' . $e->getMessage() . ' Trace: ' . $e->getTraceAsString();
         }
 

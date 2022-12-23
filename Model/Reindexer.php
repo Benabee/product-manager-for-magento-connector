@@ -101,6 +101,7 @@ class Reindexer
     public function loadAndSaveProducts(&$result, $productIds)
     {
         $this->_storeManager->setCurrentStore('admin');
+        $a = array();
 
         $count = count($productIds);
 
@@ -111,6 +112,7 @@ class Reindexer
 
             $r = new \StdClass();
             $r->productId = $productId;
+            $r->comment = "Load and save product in Magento (product ID $productId)";
 
             try {
                 $product = $this->_productRepository->getById($productId);
@@ -142,19 +144,22 @@ class Reindexer
                     }
 
                     if (!$this->_productRepository->save($product)) {
-                        $r->error = "Load and save product error (product $productId):" . " save failed product";
+                        $r->error = "Load and save product error (product ID $productId):" . " save failed product";
                     } else {
-                        $r->result = "Load and save product successful (product $productId)";
+                        $r->result = "Load and save product successful (product ID $productId)";
                     }
                 }
             } catch (\Exception $e) {
-                $r->error = "Load and save product error (product $productId):" . $e->getMessage() . '   stack trace: ' . $e->getTraceAsString();
+                $r->error = "Load and save product error (product ID $productId):" . $e->getMessage() . '   stack trace: ' . $e->getTraceAsString();
             }
             $this->_cacheManager->clean('catalog_product_' . $productId);
+
+            $r->executionTime = microtime(true) - $startTime;
+            $a[] = $r;
         }
 
-        $r->executionTime = microtime(true) - $startTime;
-        $result = $r;
+
+        $result->result = $a;
     }
 
     /**
@@ -167,10 +172,11 @@ class Reindexer
     {
         $this->_storeManager->setCurrentStore('admin');
 
-        $a = [];
+        $result->comment = "Regenerate URL rewrites for " . count($productIds) . ' product(s)';
 
         $stores = $this->_storeManager->getStores(false);
- 
+        $a = array();
+
         foreach ($stores as $store) {
 
             $collection = $this->_productCollectionFactory->create();
@@ -191,6 +197,7 @@ class Reindexer
             foreach ($productList as $product) {
                 $startTime = microtime(true);
                 $r = new \StdClass();
+                $r->comment = 'Regenerate URL rewrites for product ID ' . $product->getId();
                 $r->productId = $product->getId();
                 $r->storeId = $store->getId();
                 $r->storeCode = $store->getCode();
@@ -292,8 +299,7 @@ class Reindexer
                         \Magento\UrlRewrite\Service\V1\Data\UrlRewrite::STORE_ID => $store->getId()
                     ]);
 
-                    $r->result = 'Url rewrites deleted';
-                    $r->comment = 'Existing URLS deleted because product is not visible';
+                    $r->result = 'Url rewrites deleted. Existing URLS deleted because product is not visible';
                     $a[] = $r;
                 }
             }
@@ -341,7 +347,7 @@ class Reindexer
         return $result;
     }
 
-        
+
     /**
      * Reindex products using Magento indexers
      *
@@ -350,12 +356,43 @@ class Reindexer
      * @param  mixed $reindexerIds
      * @return void
      */
-    public function reindexProductsUsingIndexers(&$jsonRpcResult, $productIds, $reindexerIds)
+    public function reindexProductsUsingIndexers(&$jsonRpcResult, $productIds, $indexerIdsToUse)
     {
+        // Set a default list of indexers to use to reindex products if $indexerIdsToUse is empty
+        if (empty($indexerIdsToUse)) {
+            $indexerIdsToUse = [
+                'catalog_product_category',
+                'catalog_product_attribute',
+                'inventory',
+                'catalogrule_product',
+                'cataloginventory_stock',
+                'catalog_product_price',
+                'catalogsearch_fulltext'
+            ];
+        }
+
+        // Do not use these indexers to reindex products
+        $indexerIdsToSkip = [
+            'design_config_grid',
+            'customer_grid',
+            'catalog_category_product',
+            'catalogrule_rule',
+            'elasticsuite_thesaurus'
+        ];
+
+        $this->reindexUsingIndexers($jsonRpcResult, $productIds, $indexerIdsToUse, $indexerIdsToSkip, 'product ID', 'product(s)');
+    }
+
+
+    public function reindexUsingIndexers(&$jsonRpcResult, $productIds, $indexerIdsToUse, $indexerIdsToSkip, $entityTypeIdString, $entityTypeString)
+    {
+        $a = array();
+
         $this->_storeManager->setCurrentStore('admin');
 
-        $skipIndexerIds = ['design_config_grid', 'customer_grid', 'elasticsuite_thesaurus'];
-        $a = array();
+        $jsonRpcResult->comment = 'Reindex ' . count($productIds) . ' ' . $entityTypeString;
+        $jsonRpcResult->indexerIdsToUse = $indexerIdsToUse;
+        $jsonRpcResult->indexerIdsToSkip = $indexerIdsToSkip;
 
         $indexerCollection = $this->_indexerCollectionFactory->create();
         $indexerIds = $indexerCollection->getAllIds();
@@ -366,53 +403,55 @@ class Reindexer
             $indexerId = $indexer->getId();
             $skipIndexer = false;
 
-            // Skip if $indexerId is in $skipIndexerIds
-            if (in_array($indexerId, $skipIndexerIds)) {
+            // Skip if $indexerId is in $indexerIdsToSkip
+            if (in_array($indexerId, $indexerIdsToSkip)) {
                 $skipIndexer = true;
             }
 
             // Skip if $indexerId is not in $reindexerIds
-            if (!empty($reindexerIds) && !in_array($indexerId, $reindexerIds)) {
+            if (!empty($indexerIds) && !in_array($indexerId, $indexerIdsToUse)) {
                 $skipIndexer = true;
             }
 
             if ($skipIndexer) {
-                continue;
-            }
+                $r = new \StdClass();
+                $r->result = 'Skip reindex ' . $indexerId;
+                $a[] = $r;
+            } else {
+                $startTime = microtime(true);
+                if ($indexerId == 'inventory') {
+                    $skus = $this->getSkus($productIds);
+                    $sourceItems = $this->getSourceItems($skus);
+                    // $sourceItems = ['2110', '2112', '2113'];
+                    // vendor/magento/module-inventory-indexer/Indexer/SourceItem/SourceItemIndexer.php
 
-            $startTime = microtime(true);
-            if ($indexerId == "inventory") {
-                $skus = $this->getSkus($productIds);
-                $sourceItems = $this->getSourceItems($skus);
-                // $sourceItems = ["2110", "2112", "2113"];
-                // vendor/magento/module-inventory-indexer/Indexer/SourceItem/SourceItemIndexer.php
-
-                if (!empty($sourceItems)) {
+                    if (!empty($sourceItems)) {
+                        if (method_exists($indexer, 'executeList')) {
+                            //Magento version >=  2.3
+                            $indexer->executeList($sourceItems);
+                        } else {
+                            $indexer->reindexList($sourceItems);
+                        }
+                    }
+                } else {
                     if (method_exists($indexer, 'executeList')) {
                         //Magento version >=  2.3
-                        $indexer->executeList($sourceItems);
+                        $indexer->executeList($productIds);
                     } else {
-                        $indexer->reindexList($sourceItems);
+                        $indexer->reindexList($productIds);
                     }
                 }
-            } else {
-                if (method_exists($indexer, 'executeList')) {
-                    //Magento version >=  2.3
-                    $indexer->executeList($productIds);
-                } else {
-                    $indexer->reindexList($productIds);
-                }
-            }
 
-            $r = new \StdClass();
-            $r->result = "Reindex $indexerId successful (product $productsIdsString)";
-            $r->executionTime = microtime(true) - $startTime;
-            $a[] = $r;
+                $r = new \StdClass();
+                $r->result = "Reindex $indexerId successful ($entityTypeIdString $productsIdsString)";
+                $r->executionTime = microtime(true) - $startTime;
+                $a[] = $r;
+            }
         }
 
         $jsonRpcResult->result = $a;
     }
-    
+
     /**
      * Get product SKUs
      *
@@ -437,7 +476,7 @@ class Reindexer
 
         return $skus;
     }
-    
+
     /**
      * Get source items associated to SKUs
      *
@@ -472,7 +511,7 @@ class Reindexer
         return $sourceItems;
     }
 
-    
+
     /**
      * Clean product cache
      *
@@ -483,6 +522,7 @@ class Reindexer
     public function cleanProductsCache(&$result, $productIds)
     {
         $this->_storeManager->setCurrentStore('admin');
+        $result->comment = 'Clean product cache for ' . count($productIds) . ' product(s)';
 
         $count = count($productIds);
 
@@ -492,6 +532,6 @@ class Reindexer
         }
 
         $productsIdsString = implode(',', $productIds);
-        $result->result = "product cache cleaned (product $productsIdsString)";
+        $result->result = "product cache cleaned (product ID $productsIdsString)";
     }
 }
