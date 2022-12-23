@@ -1,7 +1,7 @@
 <?xml version="1.0" ?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
 	<system>
-		<section id="product_manager_connector" translate="label" sortOrder="65" showInDefault="1" showInStore="0" showInWebsite="0" >
+		<section id="product_manager_connector" translate="label" sortOrder="65" showInDefault="1" showInStore="0" showInWebsite="0">
 			<label>Product Manager for Magento Connector</label>
 			<tab>catalog</tab>
 
@@ -14,13 +14,13 @@
 				<label>Configuration</label>
 
 				<field id="enabled" translate="label,comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>Enabled</label>
-                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                    <config_path>product_manager_connector/configuration/enabled</config_path>
-                    <comment>Enable/Disable extension</comment>
-                </field>
+					<label>Enabled</label>
+					<source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+					<config_path>product_manager_connector/configuration/enabled</config_path>
+					<comment>Enable/Disable extension</comment>
+				</field>
 
-				<field id="security_key" translate="label,comment" type="text" showInDefault="1" showInStore="0" showInWebsite="0" sortOrder="10" >
+				<field id="security_key" translate="label,comment" type="text" showInDefault="1" showInStore="0" showInWebsite="0" sortOrder="10">
 					<label>Security Key</label>
 					<validate>required-entry validate-length minimum-length-44 maximum-length-44</validate>
 					<!-- <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model> -->
@@ -28,16 +28,23 @@
 					<comment>Encryption key used to secure connection with Product Manager for Magento</comment>
 				</field>
 				<field id="generate_security_key" translate="label" type="button" sortOrder="30" showInDefault="1" showInWebsite="0" showInStore="0">
-                    <frontend_model>Benabee\ProductManagerConnector\Block\Adminhtml\System\Config\SecurityKey\Generate</frontend_model>
-                    <label></label>
-                </field>
+					<frontend_model>Benabee\ProductManagerConnector\Block\Adminhtml\System\Config\SecurityKey\Generate</frontend_model>
+					<label></label>
+				</field>
 
 				<field id="acl_check" type="select" translate="label,comment" sortOrder="40" showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>Access Control</label>
-                    <source_model>Benabee\ProductManagerConnector\Model\Config\Source\AclMode</source_model>
-                    <config_path>product_manager_connector/configuration/acl_check</config_path>
-                    <comment>Restrict access to admin users allowed to access resource "Catalog/Inventory/Products". See System -> Permissions -> User Roles.</comment>
-                </field>
+					<label>Access Control</label>
+					<source_model>Benabee\ProductManagerConnector\Model\Config\Source\AclMode</source_model>
+					<config_path>product_manager_connector/configuration/acl_check</config_path>
+					<comment>Restrict access to admin users allowed to access resource "Catalog/Inventory/Products". See System -> Permissions -> User Roles.</comment>
+				</field>
+			</group>
+			<group id="general" translate="label" sortOrder="1" showInDefault="1" showInStore="0" showInWebsite="0">
+				<label>General</label>
+				<field id="display_text" translate="label" type="label" sortOrder="100" showInDefault="1" showInWebsite="0" showInStore="0">
+					<label>Version</label>
+					<comment>1.1.0</comment>
+				</field>
 			</group>
 		</section>
 	</system>
