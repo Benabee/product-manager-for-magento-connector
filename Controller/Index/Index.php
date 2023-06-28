@@ -13,7 +13,7 @@ namespace Benabee\ProductManagerConnector\Controller\Index;
  * Class Index
  * @package Benabee\ProductManagerConnector\Controller\Index
  */
-class Index extends \Magento\Framework\App\Action\Action
+class Index extends \Magento\Framework\App\Action\Action implements \Magento\Framework\App\CsrfAwareActionInterface
 {
     protected $_context;
     protected $_resultPageFactory;
@@ -153,5 +153,22 @@ class Index extends \Magento\Framework\App\Action\Action
         return $this->getResponse()->representJson(
             $this->_jsonHelper->jsonEncode($response)
         );
+    }
+
+     /**
+     * @inheritDoc
+     */
+    public function createCsrfValidationException(
+        \Magento\Framework\App\RequestInterface $request
+    ): ? \Magento\Framework\App\Request\InvalidRequestException {
+        return null;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function validateForCsrf(\Magento\Framework\App\RequestInterface $request): ?bool
+    {
+        return true;
     }
 }
