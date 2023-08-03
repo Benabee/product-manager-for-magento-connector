@@ -26,6 +26,7 @@ class Reindexer
     protected $_urlRewrite;
     protected $_urlPersist;
     protected $_urlFinder;
+    protected $_productUrlPathGenerator;
     protected $_cacheManager;
     protected $_productMetadata;
     protected $_searchCriteriaBuilder;
