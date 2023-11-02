@@ -1,11 +1,6 @@
 
-VERSION=1.1.0
-FILE=product-manager-connector-$VERSION
+VERSION=1.2.0
+FILE=product-manager-connector-$VERSION.tar.gz
 
-rm $FILE.tar.gz
-gtar -cvz --exclude .DS_Store --exclude *.sh --exclude *.tar.gz --exclude *.zip -f $FILE.tar.gz . 
-tar -ztvf $FILE.tar.gz
-
-rm $FILE.zip
-zip -r $FILE.zip . -x .DS_Store  -x *.sh -x *.tar.gz -x *.zip
-
+rm $FILE
+tar -cvz -f $FILE Block Controller doc etc Helper Model view composer.json README.md LICENSE.txt registration.php

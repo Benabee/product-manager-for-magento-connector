@@ -2,7 +2,7 @@
     "name": "benabee/product-manager-connector",
     "description": "Connector extension for Product Manager for Magento",
     "type": "magento2-module",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "license": "OSL-3.0",
     "authors": [
         {
