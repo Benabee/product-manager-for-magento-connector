@@ -178,7 +178,13 @@ class RequestHandler
 
         $securityKeyBase64 = $this->_data->getSecurityKey();
 
-        if (strlen($securityKeyBase64) != 44) {
+        if (empty($securityKeyBase64)) {
+            throw new \Magento\Framework\Exception\LocalizedException(
+                __('FATAL_ERROR_SECURITY_KEY : Security key is not set.'
+                    . 'You need to log in to your store admin panel, go to Store > Configuration > Catalog > Product Manager For Magento Connector, click "Generate new security key" button and click "Save Config" button.')
+            );
+        }
+        else if (strlen($securityKeyBase64) != 44) {
             throw new \Magento\Framework\Exception\LocalizedException(
                 __('FATAL_ERROR_SECURITY_KEY : Security key must be 44 caracters long. Current length is ' . strlen($securityKeyBase64)
                     . '. You need to log in to your store admin panel, go to Store > Configuration > Catalog > Product Manager For Magento Connector, click "Generate new security key" button and click "Save Config" button.')
