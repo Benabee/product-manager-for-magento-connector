@@ -13,7 +13,7 @@ The extension can be installed using Composer or an archive file.
 
 ### Installation using Composer
 ```
-composer require benabee/product-manager-connector --no-update
+composer require benabee/product-manager-connector
 php bin/magento module:enable Benabee_ProductManagerConnector
 php bin/magento setup:upgrade
 ```
@@ -49,7 +49,7 @@ Click File > Configuration Wizard in Product Manager.
 
 Choose Connect with "Product Manager Connector extension (Magento 2 only)".
 
-Paste the secret key.
+Paste the security key.
 
 Complete the Configuration Wizard.
 
@@ -67,6 +67,28 @@ rm -rf app/code/Benabee/ProductManagerConnector
 tar xvzf product-manager-connector-1.2.0.tar.gz app/code/Benabee/ProductManagerConnector/
 php bin/magento setup:upgrade
 ```
+
+## Uninstallation
+
+### Uninstall using Composer (if extension was installed using composer)
+```
+php bin/magento module:uninstall Benabee_ProductManagerConnector
+php  bin/magento setup:upgrade
+```
+
+### Uninstall manually (if extension wa installed using archive file)
+```
+php bin/magento module:disable Benabee_ProductManagerConnector
+rm -rf app/code/Benabee/ProductManagerConnector
+bin/magento setup:upgrade
+bin/magento cache:clean
+```
+
+Run this command to check if the module has been uninstalled
+```
+bin/magento module:status
+```
+
 
 Version history
 ===============
