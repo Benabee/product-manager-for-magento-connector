@@ -26,7 +26,7 @@ https://github.com/Benabee/product-manager-for-magento-connector/releases/latest
 
 Upload the archive to the Magento root folder and run these commands:
 ```
-tar xvzf product-manager-connector-1.2.1.tar.gz app/code/Benabee/ProductManagerConnector/
+tar xvzf product-manager-connector-1.2.2.tar.gz app/code/Benabee/ProductManagerConnector/
 php bin/magento module:enable Benabee_ProductManagerConnector
 php bin/magento setup:upgrade
 ```
@@ -64,7 +64,7 @@ php bin/magento setup:upgrade
 Upload the archive to the Magento root folder and run these commands:
 ```
 rm -rf app/code/Benabee/ProductManagerConnector
-tar xvzf product-manager-connector-1.2.1.tar.gz app/code/Benabee/ProductManagerConnector/
+tar xvzf product-manager-connector-1.2.2.tar.gz app/code/Benabee/ProductManagerConnector/
 php bin/magento setup:upgrade
 ```
 
@@ -98,5 +98,6 @@ Version history
 - Version 1.1.0 based on bridge version 2.4.1
 - Version 1.2.0 based on bridge version 2.4.2
 - Version 1.2.1 based on bridge version 2.4.2
+- Version 1.2.2 based on bridge version 2.4.2
 
 
