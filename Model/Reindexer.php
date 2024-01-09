@@ -70,8 +70,8 @@ class Reindexer
         \Magento\Framework\App\CacheInterface $cacheManager,
         \Magento\Framework\App\ProductMetadataInterface $productMetadata,
         \Magento\Framework\Api\SearchCriteriaBuilder $searchCriteriaBuilder, // Magento 2.2+ ?
-        \Magento\InventoryApi\Api\GetSourceItemsBySkuInterface $sourceItemsBySku, // Magento 2.3+
-        \Magento\InventoryApi\Api\SourceItemRepositoryInterface $sourceItemRepository //  Magento 2.3+
+        \Magento\InventoryApi\Api\GetSourceItemsBySkuInterface $sourceItemsBySku = null, // Magento 2.3+
+        \Magento\InventoryApi\Api\SourceItemRepositoryInterface $sourceItemRepository = null //  Magento 2.3+
     ) {
         $this->_storeManager = $storeManager;
         $this->_productModel = $productModel;
@@ -488,27 +488,15 @@ class Reindexer
     {
         $sourceItems = array();
 
-        /*foreach ($skus as $sku) {
-            $s = $this->_sourceItemsBySku->getSourceItemBySku($sku);
-        }*/
+        if ($this->_sourceItemRepository) { 
+            $searchCriteria = $this->_searchCriteriaBuilder->addFilter(\Magento\Catalog\Api\Data\ProductInterface::SKU, $skus, 'in')->create();
+            $sourceItemData = $this->_sourceItemRepository->getList($searchCriteria);
 
-        $searchCriteria = $this->_searchCriteriaBuilder->addFilter(\Magento\Catalog\Api\Data\ProductInterface::SKU, $skus, 'in')->create();
-
-
-        /*$searchCriteria = $this->_searchCriteriaBuilder
-            ->addFilter(new \Magento\Framework\Api\Filter([
-                \Magento\Framework\Api\Filter::KEY_FIELD => \Magento\Catalog\Api\Data\ProductInterface::SKU,
-                \Magento\Framework\Api\Filter::KEY_CONDITION_TYPE => 'in',
-                \Magento\Framework\Api\Filter::KEY_VALUE => $skus
-            ]))
-            ->create();*/
-
-        $sourceItemData = $this->_sourceItemRepository->getList($searchCriteria);
-
-        foreach ($sourceItemData->getItems() as $sourceItem) {
-            $sourceItems[] = $sourceItem->getSourceItemId();
+            foreach ($sourceItemData->getItems() as $sourceItem) {
+                $sourceItems[] = $sourceItem->getSourceItemId();
+            }
         }
-
+        
         return $sourceItems;
     }
 
