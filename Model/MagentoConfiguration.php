@@ -283,6 +283,32 @@ class MagentoConfiguration
         return $sourceModel;
     }
 
+
+    /**
+     * Get options array of a model
+     *
+     * @param $modelClass
+     * @return \stdClass
+     */
+    public function modelGetOptionArray($modelClass)
+    {
+        $sourceModel = new \stdClass();
+        $sourceModel->model_class = $modelClass;
+
+        try {
+            $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+            $model = $objectManager->create($modelClass);
+
+            if ($model) {
+                $sourceModel->options = $model->toOptionArray();
+            }
+        } catch (\Throwable $e) {
+            $sourceModel->error = 'Exception: ' . $e->getMessage() . ' Trace: ' . $e->getTraceAsString();
+        }
+
+        return $sourceModel;
+    }
+
     /**
      * Get all source models
      *
@@ -295,7 +321,7 @@ class MagentoConfiguration
         $jsonRpcResult->result = new \stdClass();
 
         $models = [];
-
+        $models[] = $this->modelGetOptionArray('Magento\Catalog\Model\Config\Source\Product\Options\Price');
         $models[] = $this->modelGetAllOptions('Magento\Bundle\Model\Product\Attribute\Source\Price\View');
         $models[] = $this->modelGetAllOptions('Magento\Bundle\Model\Product\Attribute\Source\Shipment\Type');
         $models[] = $this->modelGetAllOptions('Magento\Catalog\Model\Category\Attribute\Source\Layout');
