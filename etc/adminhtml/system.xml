@@ -43,7 +43,7 @@
 				<label>General</label>
 				<field id="display_text" translate="label" type="label" sortOrder="100" showInDefault="1" showInWebsite="0" showInStore="0">
 					<label>Version</label>
-					<comment>1.2.2</comment>
+					<comment>1.2.3</comment>
 				</field>
 			</group>
 		</section>

@@ -16,7 +16,7 @@ namespace Benabee\ProductManagerConnector\Model;
  */
 class RequestHandler
 {
-    const EXTENSION_VERSION = '1.2.2';
+    const EXTENSION_VERSION = '1.2.3';
     const BRIDGE_VERSION = '2.4.2'; // The extension is based on this bridge file version
 
     protected $_magentoConfiguration;
