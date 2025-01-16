@@ -367,6 +367,7 @@ class Reindexer
                 'inventory',
                 'catalogrule_product',
                 'cataloginventory_stock',
+                'catalog_product_flat',
                 'catalog_product_price',
                 'catalogsearch_fulltext'
             ];
