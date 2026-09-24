@@ -69,9 +69,9 @@ class Reindexer
         \Magento\CatalogUrlRewrite\Model\ProductUrlPathGenerator $productUrlPathGenerator,
         \Magento\Framework\App\CacheInterface $cacheManager,
         \Magento\Framework\App\ProductMetadataInterface $productMetadata,
-        \Magento\Framework\Api\SearchCriteriaBuilder $searchCriteriaBuilder, // Magento 2.2+ ?
-        \Magento\InventoryApi\Api\GetSourceItemsBySkuInterface $sourceItemsBySku = null, // Magento 2.3+
-        \Magento\InventoryApi\Api\SourceItemRepositoryInterface $sourceItemRepository = null //  Magento 2.3+
+        \Magento\Framework\Api\SearchCriteriaBuilder $searchCriteriaBuilder,
+        \Magento\InventoryApi\Api\GetSourceItemsBySkuInterface $sourceItemsBySku,
+        \Magento\InventoryApi\Api\SourceItemRepositoryInterface $sourceItemRepository
     ) {
         $this->_storeManager = $storeManager;
         $this->_productModel = $productModel;
