@@ -1,5 +1,5 @@
 
-VERSION=1.2.5
+VERSION=1.2.6
 FILE=product-manager-connector-$VERSION.tar.gz
 
 rm $FILE

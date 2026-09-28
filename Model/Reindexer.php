@@ -70,8 +70,8 @@ class Reindexer
         \Magento\Framework\App\CacheInterface $cacheManager,
         \Magento\Framework\App\ProductMetadataInterface $productMetadata,
         \Magento\Framework\Api\SearchCriteriaBuilder $searchCriteriaBuilder, // Magento 2.2+ ?
-        ?\Magento\InventoryApi\Api\GetSourceItemsBySkuInterface $sourceItemsBySku = null, // Magento 2.3+
-        ?\Magento\InventoryApi\Api\SourceItemRepositoryInterface $sourceItemRepository = null //  Magento 2.3+
+        ?\Magento\InventoryApi\Api\GetSourceItemsBySkuInterface $sourceItemsBySku = null, // Magento 2.3+. null if MSI modules are disabled
+        ?\Magento\InventoryApi\Api\SourceItemRepositoryInterface $sourceItemRepository = null // Magento 2.3+. null if MSI modules are disabled
     ) {
         $this->_storeManager = $storeManager;
         $this->_productModel = $productModel;
