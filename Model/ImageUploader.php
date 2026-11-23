@@ -274,11 +274,11 @@ class ImageUploader
         if ($error) {
             $jsonRpcResult->error = new \stdClass();
             $jsonRpcResult->error->errorcode = $error;
-            $jsonRpcResult->error->remotefilename = $fileName;
+            $jsonRpcResult->error->remotefilename = $filename;
             $jsonRpcResult->error->remotefilepath = $filePath;
         } else {
             $jsonRpcResult->result = new \stdClass();
-            $jsonRpcResult->result->remotefilename = $fileName;
+            $jsonRpcResult->result->remotefilename = $filename;
             $jsonRpcResult->result->remotefilepath = $filePath;
         }
     }
