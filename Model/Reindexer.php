@@ -458,7 +458,7 @@ class Reindexer
      * Get product SKUs
      *
      * @param  mixed $productIds
-     * @return void
+     * @return string[]
      */
     public function getSkus($productIds)
     {
@@ -483,7 +483,7 @@ class Reindexer
      * Get source items associated to SKUs
      *
      * @param  mixed $skus
-     * @return void
+     * @return array
      */
     public function getSourceItems($skus)
     {
