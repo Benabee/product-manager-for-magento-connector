@@ -115,6 +115,8 @@ class Index extends \Magento\Framework\App\Action\Action implements \Magento\Fra
             //$this->logger->critical($e);
             return $this->jsonResponse($e->getMessage());
         }
+
+        return $this->getResponse();
     }
 
     /**
